@@ -471,22 +471,32 @@ class LadderAE():
                 logger.warn('Decoder %d:%s without vertical input' %
                             (num, g_type))
             u = None
+            u2 = None
         else:
             if top_g:
                 u = z_ver
+                u2 = z_ver
             elif is_conv:
                 u = self.g_deconv(z_ver, in_dims, out_dims, gen_id('W'), fspec)
+                u2 = self.g_deconv(z_ver, in_dims, out_dims, gen_id('W2'), fspec)
             else:
                 W = self.weight(self.rand_init(in_dim, out_dim), gen_id('W'))
+                W2 = self.weight(self.rand_init(in_dim, out_dim), gen_id('W2'))
                 u = T.dot(z_ver, W)
+                u2 = T.dot(z_ver, W2)
 
         # Batch-normalize u
-        if u is not None:
-            norm_ax = (0,) if u.ndim <= 2 else (0, -2, -1)
+        if u is not None and u2 is not None:
+        #if u is not None:
+            norm_ax = (0,) if (u.ndim <= 2 and u2.ndim <=2) else (0, -2, -1)
+            #norm_ax = (0,) if u.ndim <= 2 else (0, -2, -1)
             keep_dims = True
             u -= u.mean(norm_ax, keepdims=keep_dims)
+            u2 -= u2.mean(norm_ax, keepdims=keep_dims)
             u /= T.sqrt(u.var(norm_ax, keepdims=keep_dims) +
                         np.float32(1e-10))
+            u2 /= T.sqrt(u2.var(norm_ax, keepdims=keep_dims) +
+                         np.float32(1e-10))
 
         # Define the g function
         if not is_conv:
@@ -500,70 +510,86 @@ class LadderAE():
             z_est = None
 
         elif g_type == 'i':
-            z_est = z_lat
+            z_est = None
+        # elif g_type == 'i':
+        #     z_est = z_lat
 
         elif g_type in ['sig']:
-            sigval = bi(0., 'c1') + wi(1., 'c2') * z_lat
-            if u is not None:
-                sigval += wi(0., 'c3') * u + wi(0., 'c4') * z_lat * u
-            sigval = T.nnet.sigmoid(sigval)
+            z_est = None
+        # elif g_type in ['sig']:
+        #     sigval = bi(0., 'c1') + wi(1., 'c2') * z_lat
+        #     if u is not None:
+        #         sigval += wi(0., 'c3') * u + wi(0., 'c4') * z_lat * u
+        #     sigval = T.nnet.sigmoid(sigval)
 
-            z_est = bi(0., 'a1') + wi(1., 'a2') * z_lat + wi(1., 'b1') * sigval
-            if u is not None:
-                z_est += wi(0., 'a3') * u + wi(0., 'a4') * z_lat * u
+        #     z_est = bi(0., 'a1') + wi(1., 'a2') * z_lat + wi(1., 'b1') * sigval
+        #     if u is not None:
+        #         z_est += wi(0., 'a3') * u + wi(0., 'a4') * z_lat * u
 
         elif g_type in ['lin']:
-            a1 = wi(1.0, 'a1')
-            b = bi(0.0, 'b')
+            z_est = None
+        # elif g_type in ['lin']:
+        #     a1 = wi(1.0, 'a1')
+        #     b = bi(0.0, 'b')
 
-            z_est = a1 * z_lat + b
+        #     z_est = a1 * z_lat + b
 
         elif g_type in ['relu']:
-            assert u is not None
-            b = bi(0., 'b')
-            x = u + b
-            z_est = self.apply_act(x, 'relu')
+            z_est = None
+        # elif g_type in ['relu']:
+        #     assert u is not None
+        #     b = bi(0., 'b')
+        #     x = u + b
+        #     z_est = self.apply_act(x, 'relu')
 
         elif g_type in ['sigmoid']:
-            assert u is not None
-            b = bi(0., 'b')
-            c = wi(1., 'c')
-            z_est = self.apply_act((u + b) * c, 'sigmoid')
+            z_est = None
+        # elif g_type in ['sigmoid']:
+        #     assert u is not None
+        #     b = bi(0., 'b')
+        #     c = wi(1., 'c')
+        #     z_est = self.apply_act((u + b) * c, 'sigmoid')
 
         elif g_type in ['comparison_g2']:
-            # sig without the uz cross term
-            sigval = bi(0., 'c1') + wi(1., 'c2') * z_lat
-            if u is not None:
-                sigval += wi(0., 'c3') * u
-            sigval = T.nnet.sigmoid(sigval)
+            z_est = None
+        # elif g_type in ['comparison_g2']:
+        #     # sig without the uz cross term
+        #     sigval = bi(0., 'c1') + wi(1., 'c2') * z_lat
+        #     if u is not None:
+        #         sigval += wi(0., 'c3') * u
+        #     sigval = T.nnet.sigmoid(sigval)
 
-            z_est = bi(0., 'a1') + wi(1., 'a2') * z_lat + wi(1., 'b1') * sigval
-            if u is not None:
-                z_est += wi(0., 'a3') * u
+        #     z_est = bi(0., 'a1') + wi(1., 'a2') * z_lat + wi(1., 'b1') * sigval
+        #     if u is not None:
+        #         z_est += wi(0., 'a3') * u
 
         elif g_type in ['comparison_g3']:
-            # sig without the sigmoid nonlinearity
-            z_est = bi(0., 'a1') + wi(1., 'a2') * z_lat
-            if u is not None:
-                z_est += wi(0., 'a3') * u + wi(0., 'a4') * z_lat * u
+            z_est = None
+        # elif g_type in ['comparison_g3']:
+        #     # sig without the sigmoid nonlinearity
+        #     z_est = bi(0., 'a1') + wi(1., 'a2') * z_lat
+        #     if u is not None:
+        #         z_est += wi(0., 'a3') * u + wi(0., 'a4') * z_lat * u
 
         elif g_type in ['comparison_g4']:
-            # No mixing between z_lat and u before final sum, otherwise similar
-            # to sig
-            def nonlin(inp, in_name='input', add_bias=True):
-                w1 = wi(1., 'w1_%s' % in_name)
-                b1 = bi(0., 'b1')
-                w2 = wi(1., 'w2_%s' % in_name)
-                b2 = bi(0., 'b2') if add_bias else 0
-                w3 = wi(0., 'w3_%s' % in_name)
-                return w2 * T.nnet.sigmoid(b1 + w1 * inp) + w3 * inp + b2
+            z_est = None
+        # elif g_type in ['comparison_g4']:
+        #     # No mixing between z_lat and u before final sum, otherwise similar
+        #     # to sig
+        #     def nonlin(inp, in_name='input', add_bias=True):
+        #         w1 = wi(1., 'w1_%s' % in_name)
+        #         b1 = bi(0., 'b1')
+        #         w2 = wi(1., 'w2_%s' % in_name)
+        #         b2 = bi(0., 'b2') if add_bias else 0
+        #         w3 = wi(0., 'w3_%s' % in_name)
+        #         return w2 * T.nnet.sigmoid(b1 + w1 * inp) + w3 * inp + b2
 
-            z_est = nonlin(z_lat, 'lat') if u is None else \
-                nonlin(z_lat, 'lat') + nonlin(u, 'ver', False)
+        #     z_est = nonlin(z_lat, 'lat') if u is None else \
+        #         nonlin(z_lat, 'lat') + nonlin(u, 'ver', False)
 
         elif g_type in ['comparison_g5']:
             # Gaussian assumption on z: (z - mu) * v + mu
-            if u is None:
+            if u is None and u2 is not None:
                 b1 = bi(0., 'b1')
                 w1 = wi(1., 'w1')
                 z_est = w1 * z_lat + b1
@@ -579,9 +605,10 @@ class LadderAE():
                 a8 = bi(0., 'a8')
                 a9 = bi(0., 'a9')
                 a10 = bi(0., 'a10')
+                print u2
 
                 mu = a1 * T.nnet.sigmoid(a2 * u + a3) + a4 * u + a5
-                v = a6 * T.nnet.sigmoid(a7 * u + a8) + a9 * u + a10
+                v = a6 * T.nnet.sigmoid(a7 * u2 + a8) + a9 * u2 + a10
 
                 z_est = (z_lat - mu) * v + mu
 
